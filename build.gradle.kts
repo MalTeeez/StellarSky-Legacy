@@ -2,8 +2,10 @@ plugins {
     id("com.gtnewhorizons.gtnhconvention")
 }
 
-// Pinned rather than derived from `git describe`, to keep matching the upstream releases.
-version = "0.1.5.7"
+// The version comes from the git tag: gtnhgradle's GitVersionModule uses the VERSION
+// environment variable when set (the release workflow passes the tag name) and falls back to
+// `git describe`. Setting it here would silently override both, so the built jar would keep
+// its old number no matter what was tagged.
 
 // StellarAPI ships inside this jar as a second @Mod. It used to be a separate Gradle build,
 // but gtnhconvention cannot be applied to a subproject, so two mods cannot share one Gradle
