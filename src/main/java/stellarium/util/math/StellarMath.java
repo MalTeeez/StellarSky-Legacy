@@ -5,6 +5,28 @@ import stellarapi.api.lib.math.Spmath;
 import stellarapi.api.lib.math.Vector3;
 
 public class StellarMath {
+	/** Decodes an IEEE 754 half float. Ported from 1.12's StellarMath. */
+	public static float toFloat(short halfFloatBits) {
+		int mant = halfFloatBits & 0x03ff;
+		int exp = halfFloatBits & 0x7c00;
+		if( exp == 0x7c00 )
+			exp = 0x3fc00;
+		else if( exp != 0 ) {
+			exp += 0x1c000;
+			if( mant == 0 && exp > 0x1c400 )
+				return Float.intBitsToFloat( ( halfFloatBits & 0x8000 ) << 16 | exp << 13 | 0x3ff );
+		}
+		else if( mant != 0 ) {
+			exp = 0x1c400;
+			do {
+				mant <<= 1;
+				exp -= 0x400;
+			} while( ( mant & 0x400 ) == 0 );
+			mant &= 0x3ff;
+		}
+		return Float.intBitsToFloat( ( halfFloatBits & 0x8000 ) << 16 | ( exp | mant ) << 13 );
+	}
+
 	
 	public static final double infmin=1.0e-2;
 	

@@ -42,8 +42,6 @@ public class StarRenderCache implements IObjRenderCache<BgStar, StarImage, IConf
 			this.appPos.y = appCoord.y;
 		}
 
-		double airmass = info.sky.calculateAirmass(this.appPos);
-
 		/*this.appMag = (float) (object.mag + airmass * info.getExtinctionRate(EnumRGBA.Alpha)
 			+ StellarMath.LumToMagWithoutSize(multiplier));*/
 
@@ -60,11 +58,12 @@ public class StarRenderCache implements IObjRenderCache<BgStar, StarImage, IConf
 
 		StarColor starColor = StarColor.getColor(object.B_V);
 
-		double alpha = OpticsHelper.getBrightnessFromMagnitude(
-				OpticsHelper.turbulance() + object.mag + airmass * info.sky.getExtinctionRate(Wavelength.visible));
-		this.red = (float) (alpha * starColor.r / 255.0 * StellarMath.MagToLumWithoutSize(airmass * info.sky.getExtinctionRate(Wavelength.red)));
-		this.green = (float) (alpha * starColor.g / 255.0 * StellarMath.MagToLumWithoutSize(airmass * info.sky.getExtinctionRate(Wavelength.V)));
-		this.blue = (float) (alpha * starColor.b / 255.0 * StellarMath.MagToLumWithoutSize(airmass * info.sky.getExtinctionRate(Wavelength.B)));
+		// No per-object extinction: the atmosphere extinction pass covers every object drawn
+		// into the sky framebuffer, so applying it here as well would double it.
+		double alpha = OpticsHelper.getBrightnessFromMagnitude(OpticsHelper.turbulance() + object.mag);
+		this.red = (float) (alpha * starColor.r / 255.0);
+		this.green = (float) (alpha * starColor.g / 255.0);
+		this.blue = (float) (alpha * starColor.b / 255.0);
 
 		checker.startDescription();
 		checker.pos(this.appPos);

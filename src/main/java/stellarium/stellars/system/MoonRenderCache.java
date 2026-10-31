@@ -53,8 +53,7 @@ public class MoonRenderCache implements IObjRenderCache<Moon, MoonImage, SolarSy
 		appCoord.x = currentPos.x;
 		appCoord.y = currentPos.y;
 
-		double airmass = info.sky.calculateAirmass(this.appCoord);
-		double appMag = object.currentMag + airmass * info.sky.getExtinctionRate(Wavelength.visible);
+		double appMag = object.currentMag;
 		this.domination = OpticsHelper.getDominationFromMagnitude(appMag);
 
 		this.size = (float) (object.radius / object.earthPos.size());

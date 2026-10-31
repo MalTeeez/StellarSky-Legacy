@@ -50,17 +50,51 @@ public class StellarSkyResources {
 	}
 	
 	
-	public static final ResourceLocation vertexAtmosphereSimple =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_simple.vsh");
 	
-	public static final ResourceLocation fragmentAtmosphereSimple =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_simple.psh");
 	
-	public static final ResourceLocation vertexAtmosphereSpCoord =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_spcoord.vsh");
 	
-	public static final ResourceLocation fragmentAtmosphereSpCoord =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_spcoord.psh");
+
+	public static final ResourceLocation vertexAtmosphereSingle =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_single.vsh");
+
+	public static final ResourceLocation fragmentAtmosphereSingle =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_single.psh");
+
+	public static final ResourceLocation vertexAtmRefraction =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_refraction.vsh");
+
+	public static final ResourceLocation fragmentAtmRefraction =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_refraction.psh");
+
+	public static final ResourceLocation vertexScope =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/scope.vsh");
+
+	public static final ResourceLocation fragmentScope =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/scope.psh");
+
+	public static final ResourceLocation vertexSkyToQueried =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/sky_to_queried.vsh");
+
+	public static final ResourceLocation fragmentSkyToQueried =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/sky_to_queried.psh");
+
+	public static final ResourceLocation vertexHDRtoLDR =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/hdr_to_ldr.vsh");
+
+	public static final ResourceLocation fragmentHDRtoLDR =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/hdr_to_ldr.psh");
+
+	public static final ResourceLocation vertexLinearToSRGB =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/linear_to_srgb.vsh");
+
+	public static final ResourceLocation fragmentLinearToSRGB =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/postprocess/linear_to_srgb.psh");
+
+	public static final ResourceLocation vertexAtmExtinction =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_extinction.vsh");
+
+	public static final ResourceLocation fragmentAtmExtinction =
+			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/atmosphere_extinction.psh");
 	
 	public static final ResourceLocation vertexScatterPointMapped =
 			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_point_mapped.vsh");
@@ -68,11 +102,7 @@ public class StellarSkyResources {
 	public static final ResourceLocation fragmentScatterPointMapped =
 			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_point_mapped.psh");
 	
-	public static final ResourceLocation vertexScatterPointSkylight =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_point_skylight.vsh");
 	
-	public static final ResourceLocation fragmentScatterPointSkylight =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_point_skylight.psh");
 	
 	public static final ResourceLocation vertexScatterFuzzyMapped =
 			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_fuzzy_mapped.vsh");
@@ -80,11 +110,7 @@ public class StellarSkyResources {
 	public static final ResourceLocation fragmentScatterFuzzyMapped =
 			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_fuzzy_mapped.psh");
 	
-	public static final ResourceLocation vertexScatterFuzzySkylight =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_fuzzy_skylight.vsh");
 	
-	public static final ResourceLocation fragmentScatterFuzzySkylight =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/scatter_fuzzy_skylight.psh");
 	
 	public static final ResourceLocation vertexTextureMapped =
 			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/src_texture_mapped.vsh");
@@ -92,11 +118,7 @@ public class StellarSkyResources {
 	public static final ResourceLocation fragmentTextureMapped =
 			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/src_texture_mapped.psh");
 	
-	public static final ResourceLocation vertexTextureSkylight =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/src_texture_skylight.vsh");
 	
-	public static final ResourceLocation fragmentTextureSkylight =
-			new ResourceLocation(StellarSkyReferences.resourceId, "shaders/src_texture_skylight.psh");
 	
 	
 	public static final ResourceLocation unroll =
@@ -227,6 +249,6 @@ public class StellarSkyResources {
 	public static final ResourceLocation atmosphereSettings =
 			new ResourceLocation(StellarSkyReferences.resourceId, "textures/gui/atmosphere.png");
 	
-	public static final ResourceLocation atmosphereCacheLevel =
-			new ResourceLocation(StellarSkyReferences.resourceId, "textures/gui/atmospherecachelevel.png");
+	public static final ResourceLocation atmosphereFragNumber =
+			new ResourceLocation(StellarSkyReferences.resourceId, "textures/gui/fragments.png");
 }

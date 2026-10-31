@@ -3,6 +3,8 @@ package stellarium.stellars;
 import net.minecraftforge.common.config.Configuration;
 import stellarapi.api.lib.config.SimpleConfigHandler;
 import stellarapi.api.lib.config.property.ConfigPropertyDouble;
+import stellarapi.api.lib.math.Spmath;
+import stellarapi.api.optics.EyeDetector;
 import stellarium.StellarSky;
 import stellarium.util.math.CachedGaussianRandom;
 
@@ -17,14 +19,27 @@ public class OpticsHelper extends SimpleConfigHandler {
 	//private static final float magCompressionBase = 6.50f;
 
 	private static final double sunMagnitude = -26.74;
-	private static final double upperMagLimit = -1.0;
+	// -0.5 in 1.12 (was -1.0 here); the HDR chain depends on this calibration.
+	private static final double upperMagLimit = -0.5;
 	
 	private static CachedGaussianRandom randomTurbulance = new CachedGaussianRandom(100, 3L);
+
+	// Naked eye resolution in rad
+	public static final float DEFAULT_RESOLUTION = (float) Math.toRadians(EyeDetector.DEFAULT_RESOLUTION);
+
+	// Relative brightness of an object of size 1 (rad)^2 compared to that star (same flux)
+	private static final float SURF_MULTIPLIER = (float) (2 * Math.PI * Spmath.sqr(DEFAULT_RESOLUTION));
+
+	/** Gets the multiplier for an object spread over {@code angularArea} (rad)^2. */
+	public static float getMultFromArea(double angularArea) {
+		return SURF_MULTIPLIER / (float) angularArea;
+	}
 	
 	public static final OpticsHelper instance = new OpticsHelper();
 	
 	private ConfigPropertyDouble propBrightnessContrast;
 	private ConfigPropertyDouble propTurb;
+	private ConfigPropertyDouble propExposure;
 	
 	private double brightnessContrast = 2.0;
 	//private float magCompression;
@@ -34,9 +49,11 @@ public class OpticsHelper extends SimpleConfigHandler {
 	
 	public OpticsHelper() {
 		this.propBrightnessContrast = new ConfigPropertyDouble("Brightness_Contrast", "", 2.0);
+		this.propExposure = new ConfigPropertyDouble("Exposure", "", 1.0);
 		this.propTurb = new ConfigPropertyDouble("Twinkling(Turbulance)", "", 1.0);
 		
 		this.addConfigProperty(this.propBrightnessContrast);
+		this.addConfigProperty(this.propExposure);
 		this.addConfigProperty(this.propTurb);
 	}
 	
@@ -57,6 +74,12 @@ public class OpticsHelper extends SimpleConfigHandler {
 		propBrightnessContrast.setMaxValue(4.0);
 		propBrightnessContrast.setMinValue(0.5);
 		
+        propExposure.setComment("Exposure of the sky. Raise it if the sky is too bright, lower it if too dark.");
+        propExposure.setRequiresMcRestart(false);
+        propExposure.setLanguageKey("config.property.client.exposure");
+        propExposure.setMinValue(0.1);
+        propExposure.setMaxValue(10.0);
+
         propTurb.setComment("Degree of the twinkling effect of star.\n"
         		+ "It determines the turbulance of atmosphere, which actually cause the twinkling effect. "
 				+ "The greater the value, the more the stars will twinkle. Default is 1.0. To disable set to 0.0");
@@ -99,6 +122,11 @@ public class OpticsHelper extends SimpleConfigHandler {
 				((Math.pow(Math.log(bglight + 1.0f)/constantBgDiv, magOffset)))))
 				- (bglight / 2.1333334f));
 	}*/
+
+	/** User exposure multiplier from the optics config. */
+	public static double getExposure() {
+		return instance == null ? 1.0 : instance.propExposure.getDouble();
+	}
 
 	public static float turbulance() {
 		return (float) (instance.turbulance * instance.randomTurbulance.nextGaussian() * 0.1);

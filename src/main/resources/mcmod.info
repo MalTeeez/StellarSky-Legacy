@@ -1,12 +1,38 @@
-[{
-  "modid": "stellarsky",
-  "name": "Stellar Sky",
-  "description": "Constellations & Planets in Minecraft! You can see Real Sky with this mod.",
-  "version": "${version}",
-  "mcversion": "${mcversion}",
-  "url": "http://www.minecraftforum.net/forums/mapping-and-modding/minecraft-mods/wip-mods/1444983-wip-stellarium-real-constellations-sun-moon",
-  "authorList": [ "Abastro" ],
-  "credits": "CC BY-SA",
-  "requiredMods": [ "Forge", "sciapi" ],
-  "depenencies": [ "sciapi", "CalendarAPI" ]
-}]
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Constellations & Planets in Minecraft! You can see Real Sky with this mod.",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/MinecraftModDevelopmentMods/StellarSky",
+		"updateUrl": "",
+		"authorList": ["Abastro"],
+		"credits": "CC BY-SA",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": ["StellarAPI"],
+		"dependencies": ["StellarAPI"],
+		"dependants": [],
+		"useDependencyInformation": false
+	}, {
+		"modid": "StellarAPI",
+		"name": "Stellar API",
+		"description": "API for Stellar Sky and other celestial-sky mods.",
+		"version": "0.1.3.8",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/MinecraftModDevelopmentMods/StellarAPI",
+		"updateUrl": "",
+		"authorList": ["Abastro"],
+		"credits": "",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": [],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}

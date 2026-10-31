@@ -54,6 +54,18 @@ public class ViewerInfo {
 				scope.getLGP() * filter.getFilterEfficiency(Wavelength.V),
 				scope.getLGP() * filter.getFilterEfficiency(Wavelength.B)
 				);
+
+		// Normalise to the visible channel. This vector multiplies every lit term, including
+		// the atmosphere's scattered light, so its absolute magnitude is not a colour: at 1e-6
+		// it wiped the scattering term out relative to the extinction base and the sky went
+		// flat. Overall gain belongs to the tonemap's exposure; what matters here is the
+		// relative spectral response.
+		// Normalise by the largest channel: the visible-wavelength efficiency can come back as
+		// zero, which would skip a guard based on brightnessMultiplier entirely.
+		double peak = Math.max(colorMultiplier.getX(),
+				Math.max(colorMultiplier.getY(), colorMultiplier.getZ()));
+		if(peak > 0.0)
+			colorMultiplier.scale(1.0 / peak);
 		
 		
 		resolutionColor.set(

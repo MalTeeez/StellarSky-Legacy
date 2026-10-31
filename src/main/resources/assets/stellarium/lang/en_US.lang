@@ -60,6 +60,8 @@ config.property.client.maglimit.tooltip=Limit of magnitude can be seen on naked 
 config.property.client.milkywaybrightness=Brightness of Milky way
 config.property.client.milkywaybrightness.tooltip=Brightness of milky way. For real world it should be 1.0 or lower, but default is set to 1.5 for visual effect.
 
+config.property.client.exposure=Sky Exposure
+config.property.client.exposure.tooltip=Raise if the sky looks too bright, lower if it looks too dark.
 config.property.client.turbulance=Twinkling(Turbulance)
 config.property.client.turbulance.tooltip=Degree of the twinkling effect of star. It determines the turbulance of atmosphere, which actually cause the twinkling effect. The greater the value, the more the stars will twinkle.
 
@@ -207,8 +209,8 @@ config.property.landscape.fragments.tooltip=Landscape is drawn with fragments. L
 ///Atmosphere
 config.category.atmosphere=Atmosphere
 config.category.atmosphere.tooltip=Configurations for the atmosphere accuracy.
-config.property.atmosphere.cachelevel=Atmosphere Cache Size Level
-config.property.atmosphere.cachelevel.tooltip=Level of atmosphere cache texture size. Less level will increase FPS, but the atmosphere will become EXPONENTIALLY defective.
+config.property.atmosphere.screenfragnumber=Screen Fragment Number
+config.property.atmosphere.screenfragnumber.tooltip=Number of fragments used to composite the sky to the screen.
 config.property.atmosphere.fragnumber=Atmosphere Fragment Number
 config.property.atmosphere.fragnumber.tooltip=Atmosphere is drawn with fragments. Less fragments will increase FPS, but the atmosphere will become more defective.
 config.property.atmosphere.interpolation=Enable Interpolation on Atmosphere

@@ -63,8 +63,7 @@ public class DeepSkyObjectCache implements IObjRenderCache<DeepSkyObject, DeepSk
 			coords[i].setWithVec(quads[i]);
 		}
 		
-		double airmass = info.sky.calculateAirmass(image.getCurrentHorizontalPos());
-		double magnitude = object.magnitude + airmass * info.sky.getExtinctionRate(Wavelength.visible);
+		double magnitude = object.magnitude;
 		this.alpha = OpticsHelper.getBrightnessFromMagnitude(magnitude) * (float)(Spmath.sqr(0.015f) / object.getSurfaceSize());
 
 		checker.startDescription();

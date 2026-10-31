@@ -12,7 +12,7 @@ public enum LayerStarRenderer implements ICelestialLayerRenderer {
 	@Override
 	public void preRender(IStellarTessellator tessellator, EnumStellarPass pass) {
 		tessellator.bindTexture(StellarSkyResources.resourceStar.getLocation());
-		tessellator.begin(false);
+		tessellator.beginPoint();
 	}
 
 	@Override

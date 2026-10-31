@@ -61,7 +61,11 @@ public class ClientProxy extends CommonProxy implements IProxy {
 				StellarSkyReferences.getConfiguration(event.getModConfigurationDirectory(),
 						StellarSkyReferences.guiSettings));
 		
-		FMLCommonHandler.instance().bus().register(new StellarClientFMLHook());
+		// Two buses: FML carries the tick events, MinecraftForge carries RenderWorldLast, and
+		// the event types are disjoint so registering on both does not double-dispatch.
+		StellarClientFMLHook clientHook = new StellarClientFMLHook();
+		FMLCommonHandler.instance().bus().register(clientHook);
+		net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(clientHook);
 		
 		OverlayRegistry.registerOverlaySet("stellarsky", new StellarSkyOverlays());
 		OverlayRegistry.registerOverlay("clock", new OverlayClockType(), this.guiConfig);
@@ -114,6 +118,7 @@ public class ClientProxy extends CommonProxy implements IProxy {
 	}
 	
 	public void onSettingsChanged(ClientSettings settings) {
+		stellarium.render.stellars.StellarRenderer.INSTANCE.initialize();
 		skyModel.updateSettings(this.clientSettings);
 		RendererRegistry.INSTANCE.evaluateRenderer(SkyModel.class).initialize(settings);
 	}
@@ -122,6 +127,8 @@ public class ClientProxy extends CommonProxy implements IProxy {
 	public void setupSkyRenderer(WorldProvider provider, String skyRenderType) {
 		skyModel.updateSettings(this.clientSettings);
 		RendererRegistry.INSTANCE.evaluateRenderer(SkyModel.class).initialize(this.clientSettings);
+
+		stellarium.render.stellars.StellarRenderer.INSTANCE.initialize();
 
 		provider.setSkyRenderer(StellarSkyAPI.getRendererFor(skyRenderType, new NewSkyRenderer(this.skyModel)));
 	}

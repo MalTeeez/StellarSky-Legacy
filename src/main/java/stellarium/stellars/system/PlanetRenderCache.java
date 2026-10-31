@@ -28,8 +28,7 @@ public class PlanetRenderCache implements IObjRenderCache<Planet, PlanetImage, I
 		appCoord.x = image.appCoord.x;
 		appCoord.y = image.appCoord.y;
 		
-		double airmass = info.sky.calculateAirmass(this.appCoord);
-		double appMag = (object.currentMag + airmass * OpticsHelper.ext_coeff_V);
+		double appMag = object.currentMag;
 		this.brightness = OpticsHelper.getBrightnessFromMagnitude(appMag);
 
 		this.size = (float) (object.radius / object.earthPos.size());
