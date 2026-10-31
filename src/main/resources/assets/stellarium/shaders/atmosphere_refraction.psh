@@ -1,0 +1,27 @@
+#version 120
+
+uniform sampler2D texture;
+
+vec4 encode(vec4 color)
+{
+    vec4 vEncoded;
+    float maxComponent = max(max(color.r, color.g), color.b );
+    float fExp = ceil( log2(maxComponent) );
+    vEncoded = color / exp2(fExp);
+    vEncoded.a = (fExp + 128) / 255;
+    return vEncoded;
+}
+
+vec4 decode(vec4 rgbe)
+{
+    vec4 vDecoded;
+    float fExp = rgbe.a * 255 - 128;
+    vDecoded = rgbe * exp2(fExp);
+    return vDecoded;
+}
+
+void main() {
+        // The target is RGBA32F, so the sky can be handed on as linear float. Encoding to RGBE
+    // here cost a round-trip through an 8-bit alpha, which is where faint star light died.
+    gl_FragColor = texture2D(texture, gl_TexCoord[0].st);
+}

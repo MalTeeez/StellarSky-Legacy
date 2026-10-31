@@ -49,6 +49,21 @@ public class AtmosphereModel implements ICheckedAtmModel {
 		this.skygreen = (float)(l >> 8 & 255) / 255.0F;
 		this.skyblue = (float)(l & 255) / 255.0F;
 
+		// ForgeHooksClient.getSkyBlendColour comes back as the base sky colour here - vanilla's
+		// sunrise/sunset tint is never folded in - but the provider does compute a proper sunset
+		// colour, so blend it ourselves the way vanilla would. Without this the sky has no
+		// sunset at all, whatever the exposure does.
+		if (world.provider instanceof stellarium.world.provider.StellarWorldProvider) {
+			float[] sunset = ((stellarium.world.provider.StellarWorldProvider) world.provider)
+					.calcSunriseSunsetColors(world.getCelestialAngle(0.0f), 0.0f);
+			if (sunset != null && sunset[3] > 0.0f) {
+				float alpha = sunset[3];
+				this.skyred += (sunset[0] - this.skyred) * alpha;
+				this.skygreen += (sunset[1] - this.skygreen) * alpha;
+				this.skyblue += (sunset[2] - this.skyblue) * alpha;
+			}
+		}
+
 		this.skyDispRed = update.sky.getDispersionFactor(Wavelength.red, 0.0f);
 		this.skyDispGreen = update.sky.getDispersionFactor(Wavelength.V, 0.0f);
 		this.skyDispBlue = update.sky.getDispersionFactor(Wavelength.B, 0.0f);
@@ -56,6 +71,16 @@ public class AtmosphereModel implements ICheckedAtmModel {
 		this.skyExtRed = update.sky.getExtinctionRate(Wavelength.red);
 		this.skyExtGreen = update.sky.getExtinctionRate(Wavelength.V);
 		this.skyExtBlue = update.sky.getExtinctionRate(Wavelength.B);
+
+		if (Boolean.getBoolean("stellarium.debug.logAtm") && world.provider instanceof stellarium.world.provider.StellarWorldProvider) {
+			stellarium.world.provider.StellarWorldProvider provider =
+					(stellarium.world.provider.StellarWorldProvider) world.provider;
+			float sunHeight = provider.getSunHeight(0.0f);
+			float[] sunset = provider.calcSunriseSunsetColors(world.getCelestialAngle(0.0f), 0.0f);
+			stellarium.StellarSky.logger.info("atm-raw: sunHeight=" + sunHeight
+					+ " sunsetColors=" + (sunset == null ? "null"
+							: sunset[0] + "," + sunset[1] + "," + sunset[2] + "," + sunset[3]));
+		}
 
 		this.height = this.heightOffset + update.getHeight(world) * this.heightIncScale;
 		

@@ -7,13 +7,11 @@ import com.google.common.collect.Maps;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.util.MathHelper;
 import net.minecraftforge.client.ForgeHooksClient;
-import stellarapi.api.lib.math.Spmath;
 import stellarapi.api.lib.math.Vector3;
 import stellarium.StellarSkyResources;
 import stellarium.render.shader.IShaderObject;
 import stellarium.render.shader.IUniformField;
 import stellarium.render.shader.ShaderHelper;
-import stellarium.render.shader.SwitchableShaders;
 import stellarium.render.sky.SkyRenderInformation;
 import stellarium.render.stellars.access.EnumStellarPass;
 import stellarium.render.stellars.phased.StellarRenderInformation;
@@ -23,36 +21,59 @@ public class AtmShaderManager {
 	private IUniformField cameraHeight;
 	private IUniformField outerRadius, innerRadius;
 	private IUniformField nSamples;
-	private IUniformField exposure;
-	private IUniformField depthToFogFactor;
 	private IUniformField extinctionFactor, gScattering, rayleighFactor, mieFactor;
+	private IUniformField lightDir, lightColor;
 
-	private float rainStrengthFactor, weatherFactor;
-	private double skyBrightness, dominationScale;
-	private boolean isFrameBufferEnabled;
+	private IShaderObject extinction, refraction;
+	private IUniformField refPitch, refPreRotated, refRelative;
+	private IUniformField extCameraHeight, extOuterRadius, extInnerRadius;
+	private IUniformField extExtinctionFactor, weatherAlpha;
+
+	private float atmWeatherScatterFactor, atmWeatherExtFactor, atmWeatherAlpha;
 	
-	private EnumMap<EnumStellarPass, SwitchableShaders> shaderMap = Maps.newEnumMap(EnumStellarPass.class);
+	private EnumMap<EnumStellarPass, IShaderObject> shaderMap = Maps.newEnumMap(EnumStellarPass.class);
 
 	public void reloadShaders() {
 		shaderMap.clear();
 		
-		SwitchableShaders atmosphere = this.injectAtmosphereHook(
-				new SwitchableShaders(
-						ShaderHelper.getInstance().buildShader("atmospherespcoord", StellarSkyResources.vertexAtmosphereSpCoord, StellarSkyResources.fragmentAtmosphereSpCoord),
-						ShaderHelper.getInstance().buildShader("atmospheresimple", StellarSkyResources.vertexAtmosphereSimple, StellarSkyResources.fragmentAtmosphereSimple)));
-		
-		SwitchableShaders scatterFuzzy = new SwitchableShaders(
-				ShaderHelper.getInstance().buildShader("fuzzymapped", StellarSkyResources.vertexScatterFuzzyMapped, StellarSkyResources.fragmentScatterFuzzyMapped),
-				ShaderHelper.getInstance().buildShader("fuzzyskylight", StellarSkyResources.vertexScatterFuzzySkylight, StellarSkyResources.fragmentScatterFuzzySkylight));
+		// Ray march per vertex, Rayleigh/Mie phase per pixel - 1.12's atmosphere_single.
+		IShaderObject atmosphere = ShaderHelper.getInstance().buildShader("atmospheresingle",
+				StellarSkyResources.vertexAtmosphereSingle, StellarSkyResources.fragmentAtmosphereSingle);
+		if(atmosphere == null)
+			throw new RuntimeException("Could not build the atmosphere scattering shader");
+		this.injectAtmosphereHook(atmosphere);
 
-		SwitchableShaders scatterPoint = new SwitchableShaders(
-				ShaderHelper.getInstance().buildShader("pointmapped", StellarSkyResources.vertexScatterPointMapped, StellarSkyResources.fragmentScatterPointMapped),
-				ShaderHelper.getInstance().buildShader("pointskylight", StellarSkyResources.vertexScatterPointSkylight, StellarSkyResources.fragmentScatterPointSkylight));
+		// Extinction is a separate, cheaper program: it integrates only the extinguished path
+		// length, and multiplies the accumulated frame before the scattering is added.
+		this.extinction = ShaderHelper.getInstance().buildShader("atmextinction",
+				StellarSkyResources.vertexAtmExtinction, StellarSkyResources.fragmentAtmExtinction);
+		if(extinction == null)
+			throw new RuntimeException("Could not build the atmosphere extinction shader");
+		this.extCameraHeight = extinction.getField("cameraHeight");
+		this.extOuterRadius = extinction.getField("outerRadius");
+		this.extInnerRadius = extinction.getField("innerRadius");
+		this.extExtinctionFactor = extinction.getField("extinctionFactor");
+		this.weatherAlpha = extinction.getField("weatherAlpha");
 
-		SwitchableShaders srcTexture = new SwitchableShaders(
-				ShaderHelper.getInstance().buildShader("srctexturemapped", StellarSkyResources.vertexTextureMapped, StellarSkyResources.fragmentTextureMapped),
-				ShaderHelper.getInstance().buildShader("srctextureskylight", StellarSkyResources.vertexTextureSkylight, StellarSkyResources.fragmentTextureSkylight));
+		// Refraction composites the sky framebuffer to the screen.
+		this.refraction = ShaderHelper.getInstance().buildShader("atmrefraction",
+				StellarSkyResources.vertexAtmRefraction, StellarSkyResources.fragmentAtmRefraction);
+		if(refraction == null)
+			throw new RuntimeException("Could not build the atmosphere refraction shader");
+		this.refPitch = refraction.getField("pitch");
+		this.refPreRotated = refraction.getField("preRotated");
+		this.refRelative = refraction.getField("relative");
 
+		// The layer shaders emit linear colour and the post chain owns exposure, so one
+		// program per pass - the old mapped/skylight split is gone.
+		IShaderObject scatterFuzzy = ShaderHelper.getInstance().buildShader("fuzzy",
+				StellarSkyResources.vertexScatterFuzzyMapped, StellarSkyResources.fragmentScatterFuzzyMapped);
+
+		IShaderObject scatterPoint = ShaderHelper.getInstance().buildShader("point",
+				StellarSkyResources.vertexScatterPointMapped, StellarSkyResources.fragmentScatterPointMapped);
+
+		IShaderObject srcTexture = ShaderHelper.getInstance().buildShader("srctexture",
+				StellarSkyResources.vertexTextureMapped, StellarSkyResources.fragmentTextureMapped);
 
 		shaderMap.put(EnumStellarPass.DominateScatter, atmosphere);
 		shaderMap.put(EnumStellarPass.SurfaceScatter, srcTexture);
@@ -61,14 +82,17 @@ public class AtmShaderManager {
 		shaderMap.put(EnumStellarPass.OpaqueScatter, scatterFuzzy);
 	}
 
-	private SwitchableShaders injectAtmosphereHook(SwitchableShaders shader) {
+	private IShaderObject injectAtmosphereHook(IShaderObject shader) {
 		this.cameraHeight = shader.getField("cameraHeight");
 		this.outerRadius = shader.getField("outerRadius");
 		this.innerRadius = shader.getField("innerRadius");
 		this.nSamples = shader.getField("nSamples");
 
-		this.exposure = shader.getField("exposure");
-		this.depthToFogFactor = shader.getField("depthToFogFactor");
+		// The scattering is integrated per light source, so these are re-set on every
+		// dominate call rather than once per pass. Left unset they read as zero and the
+		// whole atmosphere term vanishes.
+		this.lightDir = shader.getField("lightDir");
+		this.lightColor = shader.getField("lightColor");
 
 		this.extinctionFactor = shader.getField("extinctionFactor");
 		this.gScattering = shader.getField("g");
@@ -79,80 +103,102 @@ public class AtmShaderManager {
 	}
 
 	public void updateWorldInfo(StellarRenderInformation info) {
-		this.isFrameBufferEnabled = info.isFrameBufferEnabled;
-
 		float rainStrength = info.world.getRainStrength(info.partialTicks);
-		this.rainStrengthFactor = 1.0f + 5.0f * rainStrength;
-		this.weatherFactor = (float)(1.0D - (double)(rainStrength * 5.0F) / 16.0D);
-		weatherFactor *= (1.0D - (double)(info.world.getWeightedThunderStrength(info.partialTicks) * 5.0F) / 16.0D);
+		this.atmWeatherScatterFactor = rainStrength * 0.2f;
+		this.atmWeatherExtFactor = (float) (1.0f - rainStrength * 0.3f);
+		this.atmWeatherExtFactor *= (1.0f - info.world.getWeightedThunderStrength(info.partialTicks) * 0.3f);
+		this.atmWeatherAlpha = 1.0f - rainStrength;
+	}
 
-		this.skyBrightness = info.world.getSunBrightnessFactor(info.partialTicks) * 2.0f;
-		this.skyBrightness *= (info.info.brightnessMultiplier / Spmath.sqr(info.info.multiplyingPower));
+	/** Sets the per-source direction and brightness the scattering is integrated against. */
+	public void setLightSource(Vector3 dir, float red, float green, float blue) {
+		lightDir.setVector3(dir);
+		lightColor.setDouble3(red, green, blue);
+	}
 
-		this.dominationScale = 0.7;
+	/** Binds the refraction program used to composite the sky to the screen. */
+	public void bindRefractionShader(AtmosphereModel model, StellarRenderInformation info) {
+		refraction.bindShader();
+		refPitch.setDouble(Math.toRadians(-info.minecraft.renderViewEntity.rotationPitch));
+		refPreRotated.setDouble(Math.toRadians(info.boundaryRefraction));
+		refRelative.setDouble3(info.relativeWidth, info.relativeHeight, 1.0);
+	}
+
+	/** Binds the extinction program, which multiplies whatever is in the frame by extinction. */
+	public void bindExtinctionShader(AtmosphereModel model) {
+		extinction.bindShader();
+
+		extCameraHeight.setDouble(model.getHeight());
+		extOuterRadius.setDouble(model.getOuterRadius());
+		extInnerRadius.setDouble(model.getInnerRadius());
+
+		// Extinction in magnitude
+		Vector3 vec = new Vector3(model.getSkyExtRed(), model.getSkyExtGreen(), model.getSkyExtBlue());
+		extExtinctionFactor.setVector3(vec.scale(Math.log(10) * 0.4 - Math.log(this.atmWeatherExtFactor)));
+
+		weatherAlpha.setDouble(this.atmWeatherAlpha);
 	}
 	
+	/** Dev-only: -Dstellarium.debug.logAtm=true reports the scatter inputs once every 2s. */
+	private static final boolean LOG_ATM = Boolean.getBoolean("stellarium.debug.logAtm");
+	private static long lastAtmLog = 0;
+
 	public IShaderObject bindShader(AtmosphereModel model, EnumStellarPass pass) {
-		SwitchableShaders toBind = shaderMap.get(pass);
+		IShaderObject toBind = shaderMap.get(pass);
 		this.setupShader(toBind, pass, model);
 		return toBind;
 	}
 	
-	private static final String dominationMapField = "skyDominationMap";
-	private static final String skyBrightnessField = "skyBrightness";
 	private static final String defaultTexture = "texture";
-	private static final String dominationScaleField = "dominationscale";
 
-	private void setupShader(SwitchableShaders shader, EnumStellarPass pass, AtmosphereModel model) {
+	private void setupShader(IShaderObject shader, EnumStellarPass pass, AtmosphereModel model) {
 		if(pass != EnumStellarPass.DominateScatter) {
-			if(this.isFrameBufferEnabled) {
-				shader.switchShader(0);
-				shader.bindShader();
-				shader.getCurrent().getField(dominationMapField).setInteger(1);
-			} else {
-				shader.switchShader(1);
-				shader.bindShader();
-				shader.getCurrent().getField(skyBrightnessField).setDouble(this.skyBrightness);
-			}
+			shader.bindShader();
 
 			if(pass.hasTexture)
 				shader.getField(defaultTexture).setInteger(0);
-
-			shader.getField(dominationScaleField).setDouble(this.dominationScale);
 		} else {
-			if(this.isFrameBufferEnabled) {
-				shader.switchShader(0);
-			} else {
-				shader.switchShader(1);
-			}
-			
 			shader.bindShader();
-			
+
 			cameraHeight.setDouble(model.getHeight());
 			outerRadius.setDouble(model.getOuterRadius());
 			innerRadius.setDouble(model.getInnerRadius());
-			nSamples.setInteger(20);
+			nSamples.setInteger(10);
 
-			exposure.setDouble(2.0);
-			depthToFogFactor.setDouble(100.0 * Math.exp(model.getHeight()));
+			// Extinction in magnitude
+			Vector3 vec = new Vector3(model.getSkyExtRed(), model.getSkyExtGreen(), model.getSkyExtBlue());
+			extinctionFactor.setVector3(vec.scale(Math.log(10) * 0.4 - Math.log(this.atmWeatherExtFactor)));
+			gScattering.setDouble(-0.9 + 0.5 * this.atmWeatherScatterFactor);
 
-			Vector3 vec = new Vector3(model.getSkyExtRed(),
-					model.getSkyExtGreen(), model.getSkyExtBlue());
-			extinctionFactor.setVector3(vec.scale(0.9));
-			gScattering.setDouble(-0.9);
+			if (LOG_ATM) {
+				long now = System.currentTimeMillis();
+				if (now - lastAtmLog > 2000) {
+					lastAtmLog = now;
+					stellarium.StellarSky.logger.info("atm: height=" + model.getHeight()
+							+ " inner=" + model.getInnerRadius() + " outer=" + model.getOuterRadius()
+							+ " skyColor=" + model.getSkyColorRed() + "," + model.getSkyColorGreen()
+							+ "," + model.getSkyColorBlue()
+							+ " disp=" + model.getSkyDispRed() + "," + model.getSkyDispGreen()
+							+ "," + model.getSkyDispBlue()
+							+ " ext=" + model.getSkyExtRed() + "," + model.getSkyExtGreen()
+							+ "," + model.getSkyExtBlue()
+							+ " scatterF=" + this.atmWeatherScatterFactor
+							+ " extF=" + this.atmWeatherExtFactor);
+				}
+			}
 
-			double mult = 1.0;
-			
+			double mult = 200.0;
+
 			rayleighFactor.setDouble4(
-					mult * 4 * this.weatherFactor * model.getSkyColorRed() * model.getSkyDispRed() / 0.45,
-					mult * 8 * this.weatherFactor * model.getSkyColorGreen() * model.getSkyDispGreen() / 0.65,
-					mult * 16 * this.weatherFactor * model.getSkyColorBlue() * model.getSkyDispBlue(),
+					mult * 3 * (model.getSkyColorRed() / 0.48) * (1.0f + 8 * this.atmWeatherScatterFactor) * model.getSkyDispRed(),
+					mult * 7 * (model.getSkyColorGreen() / 0.65) * (1.0f + 3 * this.atmWeatherScatterFactor) * model.getSkyDispGreen(),
+					mult * 16 * model.getSkyColorBlue() * model.getSkyDispBlue(),
 					1.0);
 
 			mieFactor.setDouble4(
-					mult * 0.1 * this.rainStrengthFactor * this.weatherFactor * model.getSkyDispRed(),
-					mult * 0.2 * this.rainStrengthFactor * this.weatherFactor * model.getSkyDispGreen(),
-					mult * 0.3 * this.rainStrengthFactor * this.weatherFactor * model.getSkyDispBlue(),
+					mult * 0.05 * (1.0f + 20 * this.atmWeatherScatterFactor) * model.getSkyDispRed(),
+					mult * 0.05 * (1.0f + 20 * this.atmWeatherScatterFactor) * model.getSkyDispGreen(),
+					mult * 0.05 * (1.0f + 20 * this.atmWeatherScatterFactor) * model.getSkyDispBlue(),
 					1.0);
 		}
 	}

@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import stellarium.render.shader.IShaderObject;
 import stellarium.render.sky.SkyRenderInformation;
+import stellarium.render.stellars.access.IDominateRenderer;
 import stellarium.view.ViewerInfo;
 
 public class StellarRenderInformation {
@@ -15,6 +16,10 @@ public class StellarRenderInformation {
 
 	public final ViewerInfo info;
 	public final double screenSize;
+	public final double relativeWidth, relativeHeight;
+
+	/** Refraction offset at the view boundary, set by the atmosphere in Prepare. */
+	public double boundaryRefraction;
 
 	public StellarRenderInformation(SkyRenderInformation info) {
 		this.minecraft = info.minecraft;
@@ -25,10 +30,13 @@ public class StellarRenderInformation {
 		
 		this.info = info.info;
 		this.screenSize = info.screenSize;
+
+		this.relativeWidth = info.relativeWidth;
+		this.relativeHeight = info.relativeHeight;
 	}
 	
 	private IShaderObject activeShader;
-	private int callList;
+	private IDominateRenderer dominater;
 	
 	public void setActiveShader(IShaderObject activeShader) {
 		this.activeShader = activeShader;
@@ -38,11 +46,11 @@ public class StellarRenderInformation {
 		return this.activeShader;
 	}
 	
-	public int getAtmCallList() {
-		return this.callList;
+	public IDominateRenderer getDominateRenderer() {
+		return this.dominater;
 	}
 
-	public void setAtmCallList(int list) {
-		this.callList = list;
+	public void setDominateRenderer(IDominateRenderer dominater) {
+		this.dominater = dominater;
 	}
 }

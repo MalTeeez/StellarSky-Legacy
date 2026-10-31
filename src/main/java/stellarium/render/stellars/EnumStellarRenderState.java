@@ -7,6 +7,8 @@ import org.lwjgl.opengl.GL20;
 import com.google.common.base.Function;
 import com.google.common.base.Predicates;
 
+import net.minecraft.client.renderer.RenderHelper;
+
 import stellarium.client.ClientSettings;
 import stellarium.lib.render.RendererRegistry;
 import stellarium.lib.render.hierarchy.IDistributionConfigurable;
@@ -29,41 +31,31 @@ public enum EnumStellarRenderState implements IRenderState<Void, StellarRenderIn
 	Initial() {
 		@Override
 		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			if(resInfo.isFrameBufferEnabled) {
-				return PrepareDominateScatter;
-			} else {
-				GL11.glShadeModel(GL11.GL_SMOOTH);
-				return SetupSurfaceScatter;
-			}
+			// Same preconditions as 1.12's SkyRenderer: no lighting, no fog. The refraction
+			// composite is a screen-covering quad, so leaving fog on tints the whole sky.
+			RenderHelper.disableStandardItemLighting();
+			GL11.glDisable(GL11.GL_FOG);
+			// Vanilla enables culling before this pass. The atmosphere sphere is drawn from
+			// the inside, so its winding reads as back-facing and culling punches black holes
+			// through the sky.
+			GL11.glDisable(GL11.GL_CULL_FACE);
+			GL11.glShadeModel(GL11.GL_SMOOTH);
+			return Prepare;
 		}
 	},
 
-	//Dominate Scatter Rendering
-	PrepareDominateScatter() {
+	/**
+	 * The sky framebuffer is bound from Prepare until Finalize, so the stars and the
+	 * atmosphere are accumulated in the same HDR frame and share one extinction pass -
+	 * the 1.12 ordering.
+	 */
+	Prepare() {
 		@Override
 		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			return RenderDominateScatter;
-		}
-	},
-	RenderDominateScatter() {
-		@Override
-		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			return FinalizeDominateScatter;
-		}
-	},
-	FinalizeDominateScatter() {
-		@Override
-		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			if(resInfo.isFrameBufferEnabled)
-				return BindDominateScatter;
-			else {
-				endRendering(resInfo);
-				return null;
-			}
+			return SetupSurfaceScatter;
 		}
 	},
 
-	//Stellar Rendering
 	SetupSurfaceScatter() {
 		@Override
 		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
@@ -118,40 +110,37 @@ public enum EnumStellarRenderState implements IRenderState<Void, StellarRenderIn
 	}, RenderOpaqueScatter() {
 		@Override
 		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			OpenGlVersionUtil.disablePointSprite();;
+			OpenGlVersionUtil.disablePointSprite();
 			GL11.glShadeModel(GL11.GL_SMOOTH);
-			if(resInfo.isFrameBufferEnabled)
-				return UnbindDominateScatter;
-			else return PrepareDominateScatter;
-		}
-	},
-	
-	RenderCachedAtmosphere() {
-		@Override
-		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			endRendering(resInfo);
-			return null;
+			return SetupDominateScatter;
 		}
 	},
 
-	//Dominate Scatter Binding
-	BindDominateScatter() {
+	SetupDominateScatter() {
 		@Override
 		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			resInfo.setAtmCallList(-1);
-			GL11.glShadeModel(GL11.GL_SMOOTH);
-			return SetupSurfaceScatter;
+			return RenderDominateScatter;
 		}
-	}, UnbindDominateScatter() {
+	}, RenderDominateScatter() {
 		@Override
 		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
-			return RenderCachedAtmosphere;
+			return Finalize;
+		}
+	}, Finalize() {
+		@Override
+		public IRenderState<Void, StellarRenderInformation> transitionTo(Void pass, StellarRenderInformation resInfo) {
+			resInfo.setDominateRenderer(null);
+			endRendering(resInfo);
+			return null;
 		}
 	}
 	;
 
 	private static void endRendering(StellarRenderInformation resInfo) {
 		ShaderHelper.getInstance().releaseCurrentShader();
+
+		GL11.glEnable(GL11.GL_FOG);
+		GL11.glEnable(GL11.GL_CULL_FACE);
 
 	    GL11.glDepthMask(true);
 	    GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
@@ -182,10 +171,8 @@ public enum EnumStellarRenderState implements IRenderState<Void, StellarRenderIn
 		});
 		
 		IRenderTransition transition = builder.transitionBuilder(new InfoTransformer(), Initial)
-				.appendState(PrepareDominateScatter, EnumAtmospherePass.PrepareDominateScatter, atmosphere)
-				.appendState(RenderDominateScatter, EnumStellarPass.DominateScatter, stellar)
-				.appendState(FinalizeDominateScatter, EnumAtmospherePass.FinalizeDominateScatter, atmosphere)
-				
+				.appendState(Prepare, EnumAtmospherePass.Prepare, atmosphere)
+
 				.appendState(SetupSurfaceScatter, EnumAtmospherePass.SetupSurfaceScatter, atmosphere)
 				.appendState(RenderSurfaceScatter, EnumStellarPass.SurfaceScatter, stellar)
 				.appendState(SetupPointScatter, EnumAtmospherePass.SetupPointScatter, atmosphere)
@@ -194,11 +181,11 @@ public enum EnumStellarRenderState implements IRenderState<Void, StellarRenderIn
 				.appendState(RenderOpaque, EnumStellarPass.Opaque, stellar)
 				.appendState(SetupOpaqueScatter, EnumAtmospherePass.SetupOpaqueScatter, atmosphere)
 				.appendState(RenderOpaqueScatter, EnumStellarPass.OpaqueScatter, stellar)
-				
-				.appendState(RenderCachedAtmosphere, EnumAtmospherePass.RenderCachedDominate, atmosphere)
-				
-				.appendState(BindDominateScatter, EnumAtmospherePass.BindDomination, atmosphere)
-				.appendState(UnbindDominateScatter, EnumAtmospherePass.UnbindDomination, atmosphere)
+
+				.appendState(SetupDominateScatter, EnumAtmospherePass.SetupDominateScatter, atmosphere)
+				.appendState(RenderDominateScatter, EnumStellarPass.DominateScatter, stellar)
+
+				.appendState(Finalize, EnumAtmospherePass.Finalize, atmosphere)
 				.build();
 		
 		builder.endSetup(transition);

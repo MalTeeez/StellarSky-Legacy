@@ -1,18 +1,14 @@
 #version 120
 
-uniform vec4 invres2; // 0.5 * (pointSize / resolution)^2
-uniform float dominationscale;
-uniform sampler2D skyDominationMap;
-
-varying vec2 dominationCoord;
 varying vec4 color;
 
-const vec2 center = vec2(0.5, 0.5);
-
+// Radial falloff. 1.12 uses the separable tent 4*min(u,1-u)*min(v,1-v), but the product of
+// two 1D tents is a square with soft corners, which reads as a blurred box rather than a star.
+// smoothstep's edges must be increasing - writing smoothstep(1.0, 0.0, r2) is undefined
+// behaviour and silently blanked the dense star fields.
 void main()
 {
-    vec2 coord = gl_PointCoord - center;
-    vec4 dominated = texture2D(skyDominationMap, dominationCoord);
-    vec4 curColor = color * exp(- dot(coord, coord) * invres2);
-    gl_FragColor = curColor - sqrt(dominated.b) * dominationscale;
+    vec2 p = gl_TexCoord[0].st * 2.0 - 1.0;
+    float r2 = dot(p, p);
+    gl_FragColor = color * (1.0 - smoothstep(0.0, 1.0, r2));
 }

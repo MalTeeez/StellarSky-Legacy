@@ -1,20 +1,16 @@
 #version 120
 
-uniform vec4 invres2; // 0.5 * (particleSize / resolution)^2
-uniform float dominationscale;
-uniform sampler2D skyDominationMap;
-
 uniform float scaledRadius; // radius / particleSize
 
-varying vec2 dominationCoord;
 varying vec4 color;
 
 const vec2 center = vec2(0.5, 0.5);
 
+// Radial halo: 1.0 over the body's own disc, fading to 0 at the quad edge. The tent form
+// this replaces is the product of two 1D ramps, which makes a square with soft corners - the
+// "blurred box" that showed up around bright bodies.
 void main()
 {
-    float dist = max(distance(gl_PointCoord, center) - scaledRadius * 0.5, 0.0);
-    vec4 dominated = texture2D(skyDominationMap, dominationCoord);
-    vec4 curColor = color * exp(- dist * dist * invres2);
-    gl_FragColor = curColor - sqrt(dominated.b) * dominationscale;
+    float r = length(gl_PointCoord - center) * 2.0;
+    gl_FragColor = color * (1.0 - smoothstep(scaledRadius, 1.0, r));
 }

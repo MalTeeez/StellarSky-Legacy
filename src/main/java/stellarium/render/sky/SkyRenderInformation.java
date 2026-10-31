@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.Tessellator;
+import stellarium.util.MCUtil;
 import stellarium.view.ViewerInfo;
 
 public class SkyRenderInformation {
@@ -17,6 +18,9 @@ public class SkyRenderInformation {
 	
 	public final ViewerInfo info;
 	public final double screenSize;
+
+	/** Size of the view plane at unit distance. */
+	public final double relativeWidth, relativeHeight;
 	
 	public SkyRenderInformation(Minecraft mc, WorldClient theWorld, float partialTicks, ViewerInfo viewer) {
 		this.minecraft = mc;
@@ -30,5 +34,9 @@ public class SkyRenderInformation {
 
 		this.info = viewer;
 		this.screenSize = mc.displayWidth;
+
+		this.relativeHeight = 2 * Math.tan(0.5 * Math.toRadians(
+				MCUtil.getFOVModifier(mc.entityRenderer, partialTicks, true)));
+		this.relativeWidth = (this.relativeHeight * mc.displayWidth) / mc.displayHeight;
 	}
 }

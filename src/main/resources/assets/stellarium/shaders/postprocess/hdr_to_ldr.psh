@@ -1,0 +1,17 @@
+#version 120
+
+uniform sampler2D texture;
+uniform float brScale;
+
+void main()
+{
+    vec4 fragColor = texture2D(texture, gl_TexCoord[0].st); // linear float in
+    // Alpha must stay 1. Dividing it by brScale left a tiny value (~2e-4 by day) and the
+    // alpha test vanilla re-enables after the sky pass then discarded every fragment of the
+    // whole post chain - the screen kept whatever was cleared before it.
+    //
+    // There was also a brQuery sampler here feeding an unused diagnostic, which the compiler
+    // eliminated: the uniform lookup then failed on every shader reload and tripped a
+    // GL_INVALID_OPERATION. The frame average is not needed while exposure is analytic.
+    gl_FragColor = vec4(fragColor.rgb / brScale, 1.0);
+}
