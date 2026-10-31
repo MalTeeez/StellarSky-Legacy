@@ -1,0 +1,17 @@
+/*
+ * Stellar Sky's dependencies. See ExampleMod1.7.10/dependencies.gradle for the full
+ * list of supported configurations.
+ *
+ * StellarAPI is not a dependency: its sources are compiled into this same jar, see
+ * build.gradle.kts.
+ */
+dependencies {
+    // GLCaps.FBO / GLCaps.fboSupported(): the supported way to touch framebuffer objects on
+    // 1.7.10, picking EXT or core at runtime. Also what Angelica's redirector expects.
+    implementation("com.github.GTNewHorizons:GTNHLib:0.11.54:dev")
+
+    // Angelica compatibility has to be exercised in the dev client, otherwise it is never
+    // tested at all. Not published, and not required at runtime.
+    compileOnly("com.github.GTNewHorizons:Angelica:2.2.35:dev")
+    runtimeOnlyNonPublishable("com.github.GTNewHorizons:Angelica:2.2.35:dev")
+}
