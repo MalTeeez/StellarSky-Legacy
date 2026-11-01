@@ -1,6 +1,40 @@
 #version 120
 
 uniform sampler2D texture;
+uniform float pitch;
+uniform float preRotated;
+uniform vec3 relative;
+
+// Maps a screen coordinate to where its unrefracted light was drawn in the (pre-rotated) sky texture.
+vec2 refractedCoord(vec2 screen) {
+	// Calculates the screen coord
+	vec3 sCoord = vec3(screen - vec2(0.5), 1.0) * relative;
+
+	// Pitch up to find the world coord
+	vec3 wCoord = vec3(sCoord);
+	float c = cos(pitch);
+	float s = sin(pitch);
+	wCoord.y = sCoord.y * c + sCoord.z * s;
+	wCoord.z = - sCoord.y * s + sCoord.z * c;
+
+	// Get unrefracted position for this point and apply it. Garfinkel's formula has a pole at -4.4 degrees and is
+	// meant for objects above the horizon; clamp the elevation it sees so the view below the horizon stays finite.
+	float h = asin(wCoord.y / length(wCoord));
+	float hDeg = max(degrees(h), -1.0);
+	float ref = radians(1.0 / 60.0) / tan(radians(hDeg + 7.31 / (hDeg + 4.4))) - preRotated;
+	float d = atan(wCoord.x, wCoord.z);
+	vec3 wPos = vec3(cos(h - ref) * sin(d), sin(h - ref), cos(h - ref) * cos(d));
+
+	// Pitch down to find the screen coord
+	vec3 sPos = vec3(wPos);
+	sPos.y = wPos.y * c - wPos.z * s;
+	sPos.z = wPos.y * s + wPos.z * c;
+
+	// De-normalize
+	sPos = sPos / sPos.z;
+	sPos /= relative;
+	return sPos.xy + vec2(0.5);
+}
 
 vec4 encode(vec4 color)
 {
@@ -23,5 +57,5 @@ vec4 decode(vec4 rgbe)
 void main() {
         // The target is RGBA32F, so the sky can be handed on as linear float. Encoding to RGBE
     // here cost a round-trip through an 8-bit alpha, which is where faint star light died.
-    gl_FragColor = texture2D(texture, gl_TexCoord[0].st);
+    gl_FragColor = texture2D(texture, refractedCoord(gl_TexCoord[0].st));
 }
