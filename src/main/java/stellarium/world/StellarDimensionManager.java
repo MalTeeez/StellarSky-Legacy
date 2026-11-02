@@ -2,6 +2,8 @@ package stellarium.world;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import com.google.common.collect.Lists;
 
@@ -17,11 +19,14 @@ import stellarium.StellarSky;
 import stellarium.stellars.StellarManager;
 import stellarium.stellars.layer.StellarCollection;
 import stellarium.stellars.layer.StellarObjectContainer;
-import stellarium.util.WorldUtil;
 
 public final class StellarDimensionManager extends WorldSavedData {
 	
 	public static String ID = "stellarskydimension%s";
+
+	// get() runs every world tick; MapStorage.loadData does a File.exists() on every miss (any dimension Stellar Sky doesn't manage).
+	// Every manager is created through loadOrCreate, so remembering them here is the complete set.
+	private static final Map<World, StellarDimensionManager> BY_WORLD = new WeakHashMap<World, StellarDimensionManager>();
 	
 	private StellarManager manager;
 	
@@ -49,18 +54,17 @@ public final class StellarDimensionManager extends WorldSavedData {
 			dimManager = (StellarDimensionManager) data;
 
 		dimManager.manager = manager;
+		synchronized(BY_WORLD) {
+			BY_WORLD.put(world, dimManager);
+		}
 		
 		return dimManager;
 	}
 
 	public static StellarDimensionManager get(World world) {
-		WorldSavedData data = world.perWorldStorage.loadData(StellarDimensionManager.class,
-				String.format(ID, WorldUtil.getWorldName(world)));
-		
-		if(!(data instanceof StellarDimensionManager))
-			return null;
-		
-		return (StellarDimensionManager)data;
+		synchronized(BY_WORLD) {
+			return BY_WORLD.get(world);
+		}
 	}
 
 	public StellarDimensionManager(String id) {
