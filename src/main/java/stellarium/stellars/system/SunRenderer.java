@@ -28,7 +28,7 @@ public enum SunRenderer implements ICelestialObjectRenderer<SunRenderCache> {
 		IStellarTessellator tessellator = info.tessellator;
 
 		if(pass == EnumStellarPass.DominateScatter) {
-			tessellator.begin(false);
+			tessellator.begin();
 			tessellator.pos(cache.appCoord, info.deepDepth);
 			tessellator.color(1.0f, 1.0f, 1.0f);
 			tessellator.writeVertex();
@@ -37,7 +37,7 @@ public enum SunRenderer implements ICelestialObjectRenderer<SunRenderCache> {
 			// A soft halo around the disc. A limb fade on the sphere would be the cleaner way to
 			// blur the edge, but the disc is drawn with flat shading and the normal-based version
 			// came out constant; a radial glow costs nothing and cannot blank the sun.
-			tessellator.begin(false);
+			tessellator.begin();
 			tessellator.radius(cache.size * SUN_HALO_SCALE);
 			tessellator.pos(cache.appCoord, info.deepDepth);
 			tessellator.color(SUN_HALO_BRIGHTNESS, SUN_HALO_BRIGHTNESS, SUN_HALO_BRIGHTNESS);
@@ -53,7 +53,7 @@ public enum SunRenderer implements ICelestialObjectRenderer<SunRenderCache> {
 			}
 
 			tessellator.bindTexture(StellarSkyResources.resourceSunSurface.getLocation());
-			tessellator.begin(true);
+			tessellator.begin();
 			tessellator.radius(cache.size);
 
 			float brightness = 10000.0f;
@@ -71,25 +71,21 @@ public enum SunRenderer implements ICelestialObjectRenderer<SunRenderCache> {
 					tessellator.pos(cache.sunPos[longc][latc], info.deepDepth / 2.0f);
 					tessellator.texture(longd, latd);
 					tessellator.color(brightness, brightness, brightness);
-					tessellator.normal(cache.sunNormal[longc][latc]);
 					tessellator.writeVertex();
 					
 					tessellator.pos(cache.sunPos[longcd][latc], info.deepDepth / 2.0f);
 					tessellator.texture(longdd, latd);
 					tessellator.color(brightness, brightness, brightness);
-					tessellator.normal(cache.sunNormal[longcd][latc]);
 					tessellator.writeVertex();
 					
 					tessellator.pos(cache.sunPos[longcd][latc+1], info.deepDepth / 2.0f);
 					tessellator.texture(longdd, latdd);
 					tessellator.color(brightness, brightness, brightness);
-					tessellator.normal(cache.sunNormal[longcd][latc+1]);
 					tessellator.writeVertex();
 					
 					tessellator.pos(cache.sunPos[longc][latc+1], info.deepDepth / 2.0f);
 					tessellator.texture(longd, latdd);
 					tessellator.color(brightness, brightness, brightness);
-					tessellator.normal(cache.sunNormal[longc][latc+1]);
 					tessellator.writeVertex();
 				}
 			}

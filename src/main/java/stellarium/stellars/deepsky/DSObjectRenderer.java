@@ -11,14 +11,14 @@ public enum DSObjectRenderer implements ICelestialObjectRenderer<DeepSkyObjectCa
 
 	@Override
 	public void render(DeepSkyObjectCache cache, EnumStellarPass pass, LayerRenderInformation info) {
-		if(!cache.shouldRender)
-			return;
-		
 		IStellarTessellator tessellator = info.tessellator;
+		// One draw and a texture bind each, for ~100 objects mostly off screen.
+		if(!cache.shouldRender || !tessellator.inView(cache.centerDir, cache.angularRadius))
+			return;
 		
 		tessellator.bindTexture(cache.location);
 
-		tessellator.begin(false);
+		tessellator.begin();
 		tessellator.pos(cache.coords[0], info.deepDepth);
 		tessellator.color(cache.alpha, cache.alpha, cache.alpha);
 		tessellator.texture(1, 0);

@@ -3,6 +3,7 @@ package stellarium.render.stellars.phased;
 import java.nio.FloatBuffer;
 
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL15;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
@@ -22,16 +23,11 @@ import stellarium.view.ViewerInfo;
 public class StellarTessellator implements IStellarTessellator {
 
 	//Limits size per draw call
-	// Four vertices per point source now, so the batch is four times longer than it used to be.
 	private static final int maxBufferSize = 0x200000;
 
-	/** Dev-only: -Dstellarium.debug.logPoints=true reports how many point sources are submitted. */
-	private static final boolean LOG_POINTS = Boolean.getBoolean("stellarium.debug.logPoints");
-
-	/** Dev-only: -Dstellarium.debug.pointScale=N enlarges the point quads, to test rasterisation. */
+	/** Dev-only: -Dstellarium.debug.pointScale=N enlarges the star quads, to test rasterisation. */
 	private static final float POINT_SCALE = Float.parseFloat(
 			System.getProperty("stellarium.debug.pointScale", "1"));
-	private static long lastPointLog = 0;
 	
 	
 	private float radius;
@@ -39,14 +35,12 @@ public class StellarTessellator implements IStellarTessellator {
 	private float longitude, latitude, depth;
 	private float uCoord, vCoord;
 	private float red, green, blue;
-	private float normalX, normalY, normalZ;
 	
 	private float renderedRed, renderedGreen, renderedBlue;
 	
 	
-	private boolean renderingDominate, hasTexture, pointMode;
+	private boolean renderingDominate, hasTexture;
 	private Vector3 xAxis, yAxis;
-	private final Vector3 corner = new Vector3();
 	private double deepDepth = 100.0;
 	private IShaderObject shader;
 	private ViewerInfo viewer;
@@ -59,18 +53,17 @@ public class StellarTessellator implements IStellarTessellator {
 	
 	
 	private int currentContextSize;
-	private boolean hasNormal;
 	
 	private FloatBuffer buffer;
+	private int vbo = -1;
 	private float[] rawBuffer;
 	private int rawBufferCount;
-	// Must not be a short: a batch is well over 32767 vertices once points are quads,
-	// and a wrapped negative count is GL_INVALID_VALUE at glDrawArrays.
 	private int vertexCount;
 	
 	
 	StellarTessellator() {
-		this.buffer = GLAllocation.createDirectFloatBuffer(maxBufferSize);
+		// Quads go out as two triangles each, 6/4 of the vertices.
+		this.buffer = GLAllocation.createDirectFloatBuffer(maxBufferSize / 2 * 3);
 		this.rawBuffer = new float[maxBufferSize];
 	}
 	
@@ -96,6 +89,23 @@ public class StellarTessellator implements IStellarTessellator {
 				(double) info.relativeWidth / info.minecraft.displayWidth, 0.0));
 		this.yAxis = transformer.transform(new Vector3(0.0, 0.0,
 				(double) info.relativeHeight / info.minecraft.displayHeight));
+		// View direction in sky coordinates: up x right. Checked against the modelview the sky is
+		// drawn with. (ViewerInfo.currentDirection is a quarter turn off in azimuth in this frame.)
+		this.forward = new Vector3().setCross(this.yAxis, this.xAxis).normalize();
+		this.halfDiagonal = Math.atan(0.5 * Math.hypot(info.relativeWidth, info.relativeHeight));
+	}
+
+	private Vector3 forward;
+	private double halfDiagonal;
+
+	/**
+	 * Whether anything within {@code angularRadius} (radians) of the unit horizontal direction can
+	 * be on screen this frame. For culling small objects that would otherwise cost a draw each.
+	 */
+	@Override
+	public boolean inView(Vector3 direction, double angularRadius) {
+		double limit = this.halfDiagonal + angularRadius;
+		return limit >= Math.PI || direction.dot(this.forward) >= Math.cos(limit);
 	}
 	
 	public void initializePass(EnumStellarPass pass) {
@@ -103,54 +113,28 @@ public class StellarTessellator implements IStellarTessellator {
 		this.hasTexture = pass.hasTexture;
 	}
 	
-	@Override
-	public void beginPoint() {
-		this.pointMode = true;
-		this.hasTexture = false;
-		this.radius = 0.0f;
-		this.currentContextSize = 8; // position, colour, texcoord
-
-		this.rawBufferCount = 0;
-		this.vertexCount = 0;
+	/**
+	 * Draws the star field (one static buffer, see {@link stellarium.stellars.star.StarField})
+	 * with the point shader. Only the per-frame part is set here: the screen-space quad axes,
+	 * scaled to the sky depth, and the colour the old per-vertex processColor applied.
+	 */
+	public void drawStarField(stellarium.stellars.star.StarField field) {
+		if(this.renderingDominate)
+			return;
+		double s = POINT_SCALE * this.deepDepth;
+		shader.getField("cornerX").setDouble3(xAxis.getX() * s, xAxis.getY() * s, xAxis.getZ() * s);
+		shader.getField("cornerY").setDouble3(yAxis.getX() * s, yAxis.getY() * s, yAxis.getZ() * s);
+		shader.getField("depth").setDouble(this.deepDepth);
+		double mult = OpticsHelper.getMultFromArea(this.pointArea) * this.weatherFactor;
+		shader.getField("colorScale").setDouble3(viewer.colorMultiplier.getX() * mult,
+				viewer.colorMultiplier.getY() * mult, viewer.colorMultiplier.getZ() * mult);
+		field.draw(this.shader);
 	}
 
 	@Override
-	public void point(Vector3 direction, float red, float green, float blue) {
-		// One-pixel quad around the direction, in the screen basis, so the falloff is a real
-		// texture lookup rather than gl_PointCoord.
-		this.color(red, green, blue);
-
-		this.emitPointCorner(direction, +1.0, -1.0, 1.0f, 0.0f);
-		this.emitPointCorner(direction, +1.0, +1.0, 1.0f, 1.0f);
-		this.emitPointCorner(direction, -1.0, +1.0, 0.0f, 1.0f);
-		this.emitPointCorner(direction, -1.0, -1.0, 0.0f, 0.0f);
-	}
-
-	private final Vector3 offset = new Vector3();
-
-	private void emitPointCorner(Vector3 direction, double sx, double sy, float uCoord, float vCoord) {
-		double esx = sx * POINT_SCALE;
-		double esy = sy * POINT_SCALE;
-		this.offset.set(this.xAxis.getX() * esx + this.yAxis.getX() * esy,
-				this.xAxis.getY() * esx + this.yAxis.getY() * esy,
-				this.xAxis.getZ() * esx + this.yAxis.getZ() * esy);
-		this.corner.set(direction).add(this.offset);
-		this.corner.normalize();
-
-		this.longitude = (float) Math.atan2(this.corner.getY(), this.corner.getX());
-		this.latitude = (float) Math.asin(Math.max(-1.0, Math.min(1.0, this.corner.getZ())));
-		this.depth = (float) this.deepDepth;
-
-		this.uCoord = uCoord;
-		this.vCoord = vCoord;
-		this.writeVertex();
-	}
-
-	@Override
-	public void begin(boolean hasNormal) {
-		this.pointMode = false;
+	public void begin() {
 		if(this.hasTexture) {
-			this.currentContextSize = hasNormal? 11 : 8;
+			this.currentContextSize = 8;
 		} else {
 			this.currentContextSize = 6;
 			this.radius = 0.0f;
@@ -183,22 +167,12 @@ public class StellarTessellator implements IStellarTessellator {
 	}
 
 	@Override
-	public void normal(Vector3 normal) {
-		if(this.currentContextSize == 11) {
-			this.normalX = (float) normal.getX();
-			this.normalY = (float) normal.getY();
-			this.normalZ = (float) normal.getZ();
-			this.hasNormal = true;
-		}
-	}
-
-	@Override
 	public void writeVertex() {
 		if(this.rawBufferCount + this.currentContextSize > this.rawBuffer.length)
 			return; // batch full; the rest of this batch is dropped rather than overflowing
 
 		this.processColor();
-		
+
 		this.rawBuffer[this.rawBufferCount] = this.longitude;
 		this.rawBuffer[this.rawBufferCount + 1] = this.latitude;
 		this.rawBuffer[this.rawBufferCount + 2] = this.depth;
@@ -206,19 +180,12 @@ public class StellarTessellator implements IStellarTessellator {
 		this.rawBuffer[this.rawBufferCount + 4] = this.renderedGreen;
 		this.rawBuffer[this.rawBufferCount + 5] = this.renderedBlue;
 
-		if(this.hasTexture || this.pointMode) {
+		if(this.hasTexture) {
 			this.rawBuffer[this.rawBufferCount + 6] = this.uCoord;
 			this.rawBuffer[this.rawBufferCount + 7] = this.vCoord;
 		}
-		if(this.hasNormal) {
-			this.rawBuffer[this.rawBufferCount + 8] = this.normalX;
-			this.rawBuffer[this.rawBufferCount + 9] = this.normalY;
-			this.rawBuffer[this.rawBufferCount + 10] = this.normalZ;
-		}
-
 		this.rawBufferCount += this.currentContextSize;
 		this.vertexCount ++;
-		this.hasNormal = false;
 	}
 	
 	private static final float DEFAULT_SIZE = Spmath.Radians(0.06f);
@@ -228,7 +195,7 @@ public class StellarTessellator implements IStellarTessellator {
 		this.renderedGreen = this.green;
 		this.renderedBlue = this.blue;
 
-		if((this.pointMode || !this.hasTexture) && !this.renderingDominate) {
+		if(!this.hasTexture && !this.renderingDominate) {
 			// Point sources: flux spread over one pixel's solid angle,
 			// the 1.12 equivalent of OpticsHelper.getMultFromArea(pointArea).
 			float mult = OpticsHelper.getMultFromArea(this.pointArea);
@@ -255,22 +222,9 @@ public class StellarTessellator implements IStellarTessellator {
 
 	@Override
 	public void end() {
-		if (LOG_POINTS && this.pointMode) {
-			long now = System.currentTimeMillis();
-			if (now - lastPointLog > 2000) {
-				lastPointLog = now;
-				stellarium.StellarSky.logger.info("points: " + (this.vertexCount / 4)
-						+ " quads, first colour " + this.rawBuffer[3] + "," + this.rawBuffer[4]
-						+ "," + this.rawBuffer[5]
-						+ " pointArea=" + this.pointArea
-						+ " areaMult=" + stellarium.stellars.OpticsHelper.getMultFromArea(this.pointArea)
-						+ " credit=" + this.renderedRed);
-			}
-		}
-
 		if(this.hasTexture) {
 			;
-		} else if(!this.renderingDominate && !this.pointMode) {
+		} else if(!this.renderingDominate) {
 			float size = 10.0f * (float)viewer.resolutionGeneral + 2.0f * this.radius;
 			GL11.glPointSize(Math.max(this.rasterizedAngleRatio * size, 10.0f));
 			if(this.radius > 0.0f)
@@ -298,50 +252,53 @@ public class StellarTessellator implements IStellarTessellator {
 		}
 	}
 	
+	/**
+	 * Draws the batch from our own streaming VBO. Client arrays went through Angelica's
+	 * emulation - a copy into its own buffer plus a quad-to-triangle conversion per draw - which
+	 * was most of what the sky's small batches cost; quads are expanded to triangles here instead.
+	 */
 	private void tessellation() {
 		if(this.rawBufferCount <= 0)
 			return;
-		
-		buffer.clear();
-		buffer.put(this.rawBuffer, 0, this.rawBufferCount);
-		buffer.limit(this.rawBufferCount);
-		
-		buffer.position(0);
-		GL11.glVertexPointer(3, this.currentContextSize << 2, this.buffer);
-		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
-		
-		buffer.position(3);
-		GL11.glColorPointer(3, this.currentContextSize << 2, this.buffer);
-		GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
 
-		if(this.hasTexture || this.pointMode) {
-			buffer.position(6);
-			GL11.glTexCoordPointer(2, this.currentContextSize << 2, this.buffer);
+		int size = this.currentContextSize;
+		int drawn;
+		buffer.clear();
+		if(this.hasTexture) {
+			for(int quad = 0; quad + 4 * size <= this.rawBufferCount; quad += 4 * size) {
+				buffer.put(this.rawBuffer, quad, 3 * size); // 0 1 2
+				buffer.put(this.rawBuffer, quad, size); // 0
+				buffer.put(this.rawBuffer, quad + 2 * size, 2 * size); // 2 3
+			}
+			drawn = this.vertexCount / 4 * 6;
+		} else {
+			buffer.put(this.rawBuffer, 0, this.rawBufferCount);
+			drawn = this.vertexCount;
+		}
+		buffer.flip();
+
+		if(this.vbo == -1)
+			this.vbo = GL15.glGenBuffers();
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.vbo);
+		GL15.glBufferData(GL15.GL_ARRAY_BUFFER, this.buffer, GL15.GL_STREAM_DRAW);
+
+		int stride = size << 2;
+		GL11.glVertexPointer(3, GL11.GL_FLOAT, stride, 0L);
+		GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
+		GL11.glColorPointer(3, GL11.GL_FLOAT, stride, 3 * 4L);
+		GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
+		if(this.hasTexture) {
+			GL11.glTexCoordPointer(2, GL11.GL_FLOAT, stride, 6 * 4L);
 			GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 		}
-		
-		if(this.currentContextSize == 11) {
-			buffer.position(8);
-			GL11.glNormalPointer(this.currentContextSize << 2, this.buffer);
-			GL11.glEnableClientState(GL11.GL_NORMAL_ARRAY);
-		}
-		
-		GL11.glDrawArrays((this.hasTexture || this.pointMode)? GL11.GL_QUADS : GL11.GL_POINTS,
-				0, this.vertexCount);
-		
-		if(this.currentContextSize == 11) {
-			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
-		}
-		
-		if(this.hasTexture) {
-			GL11.glDisableClientState(GL11.GL_NORMAL_ARRAY);
-		}
-		// TODO migration to instanced rendering?
-		//org.lwjgl.opengl.ARBDrawInstanced.glDrawArraysInstancedARB(mode, first, count, primcount);
-		//org.lwjgl.opengl.EXTDrawInstanced.glDrawArraysInstancedEXT(mode, first, count, primcount);
 
+		GL11.glDrawArrays(this.hasTexture? GL11.GL_TRIANGLES : GL11.GL_POINTS, 0, drawn);
+
+		if(this.hasTexture)
+			GL11.glDisableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
 		GL11.glDisableClientState(GL11.GL_COLOR_ARRAY);
 		GL11.glDisableClientState(GL11.GL_VERTEX_ARRAY);
+		GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
 	}
 	
 	

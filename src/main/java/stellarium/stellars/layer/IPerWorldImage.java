@@ -10,4 +10,12 @@ public interface IPerWorldImage<Obj extends StellarObject> extends ICelestialObj
 	public void initialize(Obj object, ICelestialCoordinate coordinate, ISkyEffect sky, CelestialPeriod yearPeriod);
 	public void updateCache(Obj object, ICelestialCoordinate coordinate, ISkyEffect sky);
 
+	/**
+	 * False for images that work out their state when asked instead, so the collection can skip
+	 * them on its per-tick update (thousands of stars that nothing reads most ticks).
+	 */
+	public default boolean needsTickUpdate() {
+		return true;
+	}
+
 }

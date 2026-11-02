@@ -30,6 +30,9 @@ public class DeepSkyObjectCache implements IObjRenderCache<DeepSkyObject, DeepSk
 	protected ResourceLocation location;
 	protected float alpha;
 	protected boolean shouldRender;
+	/** Horizontal unit direction of the quad's centre, and its angular radius in radians. */
+	protected final Vector3 centerDir = new Vector3();
+	protected double angularRadius;
 	private Vector3[] quads = new Vector3[4];
 
 	@Override
@@ -57,11 +60,18 @@ public class DeepSkyObjectCache implements IObjRenderCache<DeepSkyObject, DeepSk
 		Vector3 dirHeight = new Vector3().setCross(dirWidth, center).normalize();
 		texture.fill(center, dirWidth, dirHeight, this.quads);
 
+		centerDir.set(0.0, 0.0, 0.0);
 		for(int i = 0; i < 4; i++) {
 			EqtoEc.transform(quads[i]);
 			info.coordinate.getProjectionToGround().transform(quads[i]);
 			coords[i].setWithVec(quads[i]);
+			centerDir.add(quads[i]);
 		}
+		centerDir.normalize();
+		double cosRadius = 1.0;
+		for(int i = 0; i < 4; i++)
+			cosRadius = Math.min(cosRadius, quads[i].dot(centerDir) / quads[i].size());
+		this.angularRadius = Math.acos(Math.max(-1.0, Math.min(1.0, cosRadius)));
 		
 		double magnitude = object.magnitude;
 		this.alpha = OpticsHelper.getBrightnessFromMagnitude(magnitude) * (float)(Spmath.sqr(0.015f) / object.getSurfaceSize());

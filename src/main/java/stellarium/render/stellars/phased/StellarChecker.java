@@ -92,6 +92,23 @@ public class StellarChecker implements IStellarChecker {
 		} else return false;
 	}
 
+	/**
+	 * {@link #checkRendered()} for a point source (radius 0), folded into one scale per channel:
+	 * the source is rendered iff max(colour * scale) > 1 and it is above
+	 * {@link #getLeastAltitudeRendered()}. Lets the star shader cull on the GPU.
+	 */
+	public Vector3 getPointCullScale() {
+		double k = Spmath.sqr(DEFAULT_SIZE) / leastBrightnessRendered;
+		return new Vector3(
+				colorMultiplier.getX() / Spmath.sqr(multiplyingPower * resolutionColor.getX()) * k,
+				colorMultiplier.getY() / Spmath.sqr(multiplyingPower * resolutionColor.getY()) * k,
+				colorMultiplier.getZ() / Spmath.sqr(multiplyingPower * resolutionColor.getZ()) * k);
+	}
+
+	public double getLeastAltitudeRendered() {
+		return atmChecker.getLeastAltitudeRendered();
+	}
+
 	@Override
 	public boolean checkEnoughRadius() {
 		return this.radius > NOT_POINT_MULT * this.resolutionGeneral;

@@ -16,7 +16,7 @@ public enum PlanetRenderer implements ICelestialObjectRenderer<PlanetRenderCache
 		
 		IStellarTessellator tessellator = info.tessellator;
 		
-		tessellator.begin(false);
+		tessellator.begin();
 		tessellator.pos(cache.appCoord, info.deepDepth);
 		tessellator.color(cache.brightness, cache.brightness, cache.brightness);
 		tessellator.radius(cache.size);

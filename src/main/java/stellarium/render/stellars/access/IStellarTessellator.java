@@ -8,18 +8,8 @@ public interface IStellarTessellator {
 	
 	public void bindTexture(ResourceLocation location);
 	
-	public void begin(boolean hasNormal);
+	public void begin();
 
-	/**
-	 * Starts a batch of screen-facing point quads. Each {@link #point} emits its own four
-	 * corners, so the falloff can use texcoords the way 1.12's {@code renderPoint} does,
-	 * instead of relying on gl_PointCoord.
-	 */
-	public void beginPoint();
-
-	/** Emits one screen-facing quad of about a pixel, centred on the unit direction given. */
-	public void point(Vector3 direction, float red, float green, float blue);
-	
 	public void pos(SpCoord pos, float depth);
 
 	/**
@@ -30,9 +20,6 @@ public interface IStellarTessellator {
 	/** For textured objects */
 	public void texture(float u, float v);
 	
-	/** For textured objects */
-	public void normal(Vector3 normal);
-	
 	public void writeVertex();
 	
 	/**
@@ -42,6 +29,9 @@ public interface IStellarTessellator {
 	public void radius(float angularRadius);
 	
 	public void end();
+
+	/** Whether anything within {@code angularRadius} (radians) of the unit horizontal direction can be on screen. */
+	public boolean inView(Vector3 direction, double angularRadius);
 
 
 	/**

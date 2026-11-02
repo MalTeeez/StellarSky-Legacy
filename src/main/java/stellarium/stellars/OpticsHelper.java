@@ -132,6 +132,11 @@ public class OpticsHelper extends SimpleConfigHandler {
 		return (float) (instance.turbulance * instance.randomTurbulance.nextGaussian() * 0.1);
 	}
 
+	/** Standard deviation, in magnitudes, of {@link #turbulance()}. */
+	public static double getTurbulenceStd() {
+		return instance.turbulance * 0.1;
+	}
+
 	public static float getBrightnessFromMagnitude(double magnitude) {
 		return (float) Math.pow(magnitudeBase, upperMagLimit - magnitude);
 	}

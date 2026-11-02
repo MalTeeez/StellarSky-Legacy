@@ -23,6 +23,9 @@ public class AtmosphereModel implements ICheckedAtmModel {
 	private float skyExtRed, skyExtGreen, skyExtBlue;
 	private float skyDispRed, skyDispGreen, skyDispBlue;
 	
+	private World blendWorld;
+	private int blendX, blendZ, blendColor;
+
 	private boolean azimuthCheckEnabled;
 	private double leastAzimuthRendered;
 
@@ -44,7 +47,15 @@ public class AtmosphereModel implements ICheckedAtmModel {
 		int i = MathHelper.floor_double(update.currentPosition.getX());
 		int j = MathHelper.floor_double(update.currentPosition.getY());
 		int k = MathHelper.floor_double(update.currentPosition.getZ());
-		int l = ForgeHooksClient.getSkyBlendColour(world, i, j, k);
+		// The biome blend walks a square of columns every call; it only changes when the camera
+		// moves to another column (or world), so keep the last result.
+		if(world != this.blendWorld || i != this.blendX || k != this.blendZ) {
+			this.blendColor = ForgeHooksClient.getSkyBlendColour(world, i, j, k);
+			this.blendWorld = world;
+			this.blendX = i;
+			this.blendZ = k;
+		}
+		int l = this.blendColor;
 		this.skyred = (float)(l >> 16 & 255) / 255.0F;
 		this.skygreen = (float)(l >> 8 & 255) / 255.0F;
 		this.skyblue = (float)(l & 255) / 255.0F;
@@ -134,6 +145,11 @@ public class AtmosphereModel implements ICheckedAtmModel {
 
 	public float getSkyExtBlue() {
 		return this.skyExtBlue;
+	}
+
+	@Override
+	public double getLeastAltitudeRendered() {
+		return this.leastAzimuthRendered;
 	}
 
 	@Override

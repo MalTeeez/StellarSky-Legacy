@@ -17,7 +17,7 @@ public enum MilkywayRenderer implements ICelestialObjectRenderer<MilkywayRenderC
 	public void render(MilkywayRenderCache cache, EnumStellarPass pass, LayerRenderInformation info) {
 		IStellarTessellator tessellator = info.tessellator;
 
-		tessellator.begin(true);
+		tessellator.begin();
 		tessellator.bindTexture(StellarSkyResources.resourceMilkyway.getLocation());
 		tessellator.color(cache.milkywayAbsBr, cache.milkywayAbsBr, cache.milkywayAbsBr);
 
@@ -30,22 +30,18 @@ public enum MilkywayRenderer implements ICelestialObjectRenderer<MilkywayRenderC
 				float latdd=1.0f-(float)(latc+1)/(float)cache.latn;
 				
 				tessellator.pos(cache.milkywaypos[longc][latc], info.deepDepth);
-				tessellator.normal(cache.milkywaypos[longc][latc].getVec());
 				tessellator.texture(longd, latd);
 				tessellator.writeVertex();
 				
 				tessellator.pos(cache.milkywaypos[longc][latc+1], info.deepDepth);
-				tessellator.normal(cache.milkywaypos[longc][latc+1].getVec());
 				tessellator.texture(longd, latdd);
 				tessellator.writeVertex();
 				
 				tessellator.pos(cache.milkywaypos[longcd][latc+1], info.deepDepth);
-				tessellator.normal(cache.milkywaypos[longcd][latc+1].getVec());
 				tessellator.texture(longdd, latdd);
 				tessellator.writeVertex();
 				
 				tessellator.pos(cache.milkywaypos[longcd][latc], info.deepDepth);
-				tessellator.normal(cache.milkywaypos[longcd][latc].getVec());
 				tessellator.texture(longdd, latd);
 				tessellator.writeVertex();
 			}

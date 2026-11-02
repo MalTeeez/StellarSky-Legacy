@@ -24,7 +24,6 @@ import stellarium.stellars.render.ICelestialLayerRenderer;
 import stellarium.stellars.star.BgStar;
 import stellarium.stellars.star.LayerBgStar;
 import stellarium.stellars.star.StarImage;
-import stellarium.stellars.star.StarRenderCache;
 import stellarium.util.math.StellarMath;
 
 public class LayerBrStar extends LayerBgStar<IConfigHandler, INBTConfig> {
@@ -65,7 +64,6 @@ public class LayerBrStar extends LayerBgStar<IConfigHandler, INBTConfig> {
 		for(BgStar star : this.stars)
 		{
 			container.loadObject("Star", star);
-			container.addRenderCache(star, new StarRenderCache());
 			
 			if(!star.getName().trim().isEmpty())
 				container.addImageType(star, StarImage.class);

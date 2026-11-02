@@ -1,5 +1,7 @@
 package stellarium.render.stellars.layer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Function;
@@ -13,6 +15,7 @@ import stellarapi.api.lib.config.IConfigHandler;
 import stellarium.client.ClientSettings;
 import stellarium.lib.hierarchy.Hierarchy;
 import stellarium.render.stellars.access.IStellarChecker;
+import stellarium.render.stellars.phased.StellarChecker;
 import stellarium.stellars.layer.IStellarLayerType;
 import stellarium.stellars.layer.StellarCollection;
 import stellarium.stellars.layer.StellarObject;
@@ -32,6 +35,8 @@ public class StellarLayerModel<Obj extends StellarObject> {
 
 	private MetadataQueryCache<Obj, IUpdateTracked<IObjRenderCache>> cache;
 	private Map<Obj, IObjRenderCache> cacheMap = Maps.newHashMap();
+	// Rendered every frame; walking an array beats walking HashMap nodes. Rebuilt when cacheMap changes.
+	private List<IObjRenderCache> cacheList;
 	private MetadataUpdateTracker<Obj, IObjRenderCache> updateTracker;
 
 	private RenderCacheLoader cacheLoader;
@@ -51,10 +56,12 @@ public class StellarLayerModel<Obj extends StellarObject> {
 
 	public void addRenderCache(Obj object, IObjRenderCache<Obj, ?, ?> renderCache) {
 		cacheMap.put(object, renderCache);
+		this.cacheList = null;
 	}
 	
 	public void removeCache(Obj object) {
 		cacheMap.remove(object);
+		this.cacheList = null;
 	}
 
 
@@ -77,6 +84,7 @@ public class StellarLayerModel<Obj extends StellarObject> {
 		cacheUpdater.set(update, checker);
 
 		updateTracker.updateMap(this.cacheMap);
+		container.getType().getLayerRenderer().onTick(container, update, (StellarChecker) checker);
 
 		if(this.cache != null)
 			this.fromCache = ImmutableList.copyOf(updateTracker.addUpdateOnIteration(
@@ -84,7 +92,9 @@ public class StellarLayerModel<Obj extends StellarObject> {
 	}
 
 	public Iterable<IObjRenderCache> getRenderCaches() {
-		return this.fromCache != null? Iterables.concat(cacheMap.values(), this.fromCache) : cacheMap.values();
+		if(this.cacheList == null)
+			this.cacheList = new ArrayList<IObjRenderCache>(cacheMap.values());
+		return this.fromCache != null? Iterables.concat(this.cacheList, this.fromCache) : this.cacheList;
 	}
 	
 	private IConfigHandler getSubSettings(ClientSettings settings) {

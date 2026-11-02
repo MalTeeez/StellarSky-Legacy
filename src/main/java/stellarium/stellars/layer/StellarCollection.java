@@ -41,6 +41,8 @@ public class StellarCollection<Obj extends StellarObject> implements ICelestialC
 	private ISkyEffect sky;
 	
 	private Map<Obj, IPerWorldImage> imageMap = Maps.newHashMap();
+	/** The images of imageMap that need the per-tick update. */
+	private Map<Obj, IPerWorldImage> tickedImageMap = Maps.newHashMap();
 	
 	private MetadataQueryCache<Obj, IUpdateTracked<IPerWorldImage>> cache;
 	private MetadataUpdateTracker<Obj, IPerWorldImage> updateTracker;
@@ -112,8 +114,9 @@ public class StellarCollection<Obj extends StellarObject> implements ICelestialC
 	}
 
 	public IPerWorldImage loadImageFor(Obj object) {
-		if(imageMap.containsKey(object))
-			return imageMap.get(object);
+		IPerWorldImage image = imageMap.get(object);
+		if(image != null)
+			return image;
 		else if(cache != null)
 			return cache.lazyLoader().apply(object).getMetadata();
 		else return null;
@@ -134,6 +137,8 @@ public class StellarCollection<Obj extends StellarObject> implements ICelestialC
 				IPerWorldImage image = imageTypeMap.get(object).call();
 				image.initialize(object, this.coordinate, this.sky, this.yearPeriod);
 				imageMap.put(object, image);
+				if(image.needsTickUpdate())
+					tickedImageMap.put(object, image);
 			}
 		} catch (Exception exc) {
 			Throwables.propagate(exc);
@@ -141,12 +146,14 @@ public class StellarCollection<Obj extends StellarObject> implements ICelestialC
 	}
 	
 	public void removeImages(Set<Obj> removedSet) {
-		for(Obj object : removedSet)
+		for(Obj object : removedSet) {
 			imageMap.remove(object);
+			tickedImageMap.remove(object);
+		}
 	}
 
 	public void update() {
-		updateTracker.updateMap(this.imageMap);
+		updateTracker.updateMap(this.tickedImageMap);
 	}
 
 	

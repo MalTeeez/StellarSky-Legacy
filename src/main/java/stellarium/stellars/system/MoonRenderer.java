@@ -16,13 +16,13 @@ public enum MoonRenderer implements ICelestialObjectRenderer<MoonRenderCache> {
 	public void render(MoonRenderCache cache, EnumStellarPass pass, LayerRenderInformation info) {
 		IStellarTessellator tessellator = info.tessellator;
 		if(pass == EnumStellarPass.DominateScatter && cache.shouldRenderDominate) {
-			tessellator.begin(false);
+			tessellator.begin();
 			tessellator.pos(cache.appCoord, info.deepDepth);
 			tessellator.color(cache.domination, cache.domination, cache.domination);
 			tessellator.writeVertex();
 			tessellator.end();
 		} else if(pass == EnumStellarPass.OpaqueScatter && cache.shouldRender) {
-			/*tessellator.begin(false);
+			/*tessellator.begin();
 			tessellator.radius(cache.size);
 			tessellator.pos(cache.appCoord, info.deepDepth);
 			tessellator.color(cache.brightness, cache.brightness, cache.brightness);
@@ -30,7 +30,7 @@ public enum MoonRenderer implements ICelestialObjectRenderer<MoonRenderCache> {
 			tessellator.end();*/
 		} else if(pass == EnumStellarPass.Opaque && cache.shouldRender) {
 			tessellator.bindTexture(StellarSkyResources.resourceMoonSurface.getLocation());
-			tessellator.begin(true);
+			tessellator.begin();
 			tessellator.radius(cache.size);
 
 			int longc, latc;
@@ -46,25 +46,21 @@ public enum MoonRenderer implements ICelestialObjectRenderer<MoonRenderCache> {
 					tessellator.pos(cache.moonPos[longc][latc], info.deepDepth / 2.0f);
 					tessellator.texture(longd, latd);
 					tessellator.color(cache.moonilum[longc][latc], cache.moonilum[longc][latc], cache.moonilum[longc][latc]);
-					tessellator.normal(cache.moonnormal[longc][latc]);
 					tessellator.writeVertex();
 					
 					tessellator.pos(cache.moonPos[longcd][latc], info.deepDepth / 2.0f);
 					tessellator.texture(longdd, latd);
 					tessellator.color(cache.moonilum[longcd][latc], cache.moonilum[longcd][latc], cache.moonilum[longcd][latc]);
-					tessellator.normal(cache.moonnormal[longcd][latc]);
 					tessellator.writeVertex();
 					
 					tessellator.pos(cache.moonPos[longcd][latc+1], info.deepDepth / 2.0f);
 					tessellator.texture(longdd, latdd);
 					tessellator.color(cache.moonilum[longcd][latc+1], cache.moonilum[longcd][latc+1], cache.moonilum[longcd][latc+1]);
-					tessellator.normal(cache.moonnormal[longcd][latc+1]);
 					tessellator.writeVertex();
 					
 					tessellator.pos(cache.moonPos[longc][latc+1], info.deepDepth / 2.0f);
 					tessellator.texture(longd, latdd);
 					tessellator.color(cache.moonilum[longc][latc+1], cache.moonilum[longc][latc+1], cache.moonilum[longc][latc+1]);
-					tessellator.normal(cache.moonnormal[longc][latc+1]);
 					tessellator.writeVertex();
 				}
 			}

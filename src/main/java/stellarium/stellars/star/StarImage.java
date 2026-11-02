@@ -20,11 +20,14 @@ public class StarImage implements IPerWorldImage<BgStar> {
 	private byte bayerSubId = 0;
 	private String binary;
 	
-	private SpCoord appPos = new SpCoord();
+	private ICelestialCoordinate coordinate;
+	private ISkyEffect sky;
 	
 	@Override
 	public void initialize(BgStar object, ICelestialCoordinate coordinate, ISkyEffect effect, CelestialPeriod year) {
 		this.main = object;
+		this.coordinate = coordinate;
+		this.sky = effect;
 		
 		SpCoord coord = new SpCoord();
 		coord.setWithVec(object.pos);
@@ -44,12 +47,13 @@ public class StarImage implements IPerWorldImage<BgStar> {
 		//  This covers every binaries, (Alp1/2 Cen: A/B)
 	}
 	
+	/** Positions are worked out on demand, see {@link #getCurrentHorizontalPos()}. */
 	@Override
-	public void updateCache(BgStar object, ICelestialCoordinate coordinate, ISkyEffect sky) {
-		Vector3 ref = new Vector3(object.pos);
-		coordinate.getProjectionToGround().transform(ref);
-		appPos.setWithVec(ref);
-		sky.applyAtmRefraction(this.appPos);
+	public void updateCache(BgStar object, ICelestialCoordinate coordinate, ISkyEffect sky) { }
+
+	@Override
+	public boolean needsTickUpdate() {
+		return false;
 	}
 	
 	@Override
@@ -84,7 +88,14 @@ public class StarImage implements IPerWorldImage<BgStar> {
 
 	@Override
 	public SpCoord getCurrentHorizontalPos() {
-		return this.appPos;
+		// The coordinate is updated every tick, so this is always current. Nothing reads star
+		// positions on most ticks; the star field itself is rendered on the GPU.
+		Vector3 ref = new Vector3(main.pos);
+		coordinate.getProjectionToGround().transform(ref);
+		SpCoord appPos = new SpCoord();
+		appPos.setWithVec(ref);
+		sky.applyAtmRefraction(appPos);
+		return appPos;
 	}
 
 	@Override

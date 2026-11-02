@@ -19,9 +19,14 @@ public class BgStar extends StellarObject {
 		this.pos = pos;
 	}
 
+	private String id;
+
+	// Used by StellarObject.hashCode/equals on every per-tick image lookup; cache instead of re-stringifying.
 	@Override
 	public String getID() {
-		return String.valueOf(this.number);
+		if(this.id == null)
+			this.id = String.valueOf(this.number);
+		return this.id;
 	}
 
 	public String getName() {
