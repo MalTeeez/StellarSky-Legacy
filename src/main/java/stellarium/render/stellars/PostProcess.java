@@ -75,8 +75,12 @@ public class PostProcess {
 		// Twilight window: the sky stays lit for a while after the sun is geometrically below
 		// the horizon. Without this the curve falls straight to the night floor at sunset and
 		// dusk renders as a flat, 10000x-overexposed blue.
-		double day = Math.max(0.0, Math.min(1.0, (sun + 0.10) / 0.25));
-		double scale = NIGHT_EXPOSURE + (DAY_EXPOSURE - NIGHT_EXPOSURE) * Math.pow(day, 4.0);
+		// Twilight sky brightness grows roughly exponentially with sun height, so ramp the exposure
+		// log-linearly: night floor at -0.10 (~-6 deg), full day by +0.02. A day^4 ramp over a
+		// wider window stayed near the floor until the sun was up, washing the horizon-crossing
+		// out white (sun at 0 needs ~200, it gave ~14).
+		double day = Math.max(0.0, Math.min(1.0, (sun + 0.10) / 0.12));
+		double scale = NIGHT_EXPOSURE * Math.pow(DAY_EXPOSURE / NIGHT_EXPOSURE, day);
 
 		return Math.max(1.0e-4, Math.min(1000000.0, scale * stellarium.stellars.OpticsHelper.getExposure()));
 	}
@@ -140,9 +144,13 @@ public class PostProcess {
 
 	public void postProcess(SkyRenderInformation info) {
 		long currentTime = System.currentTimeMillis();
-		this.sunHeight = info.world.provider instanceof stellarium.world.provider.StellarWorldProvider
-				? ((stellarium.world.provider.StellarWorldProvider) info.world.provider)
-						.getSunHeight(info.partialTicks)
+		// Read the sun the atmosphere is lit by straight from the dimension: the provider is not
+		// always ours (Patch_Provider off, or another mod swapping it after us), and vanilla's
+		// celestial angle then put exposure on a different clock - day exposure over a twilight
+		// sky at dawn (black), night exposure over a lit sky at dusk (white).
+		stellarium.world.StellarDimensionManager dim = stellarium.world.StellarDimensionManager.get(info.world);
+		this.sunHeight = dim != null && !dim.getSuns().isEmpty()
+				? (float) stellarapi.api.lib.math.Spmath.sind(dim.getSuns().get(0).getCurrentHorizontalPos().y)
 				: (float) Math.cos(2.0 * Math.PI * info.world.getCelestialAngle(info.partialTicks));
 		// Every stage of this chain replaces its target, and the query shader writes only .r
 		// (alpha 0), so blending must be off or the query writes nothing. Save the caller's
